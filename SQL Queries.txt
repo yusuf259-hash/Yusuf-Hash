@@ -1,0 +1,169 @@
+SQL Queries
+
+Users Table
+
+CREATE TABLE dbo.Users
+(
+    UserId INT IDENTITY(1,1) NOT NULL,
+    FullName NVARCHAR(100) NOT NULL,
+    Email NVARCHAR(150) NOT NULL,
+    Username NVARCHAR(50) NOT NULL,
+    PasswordHash NVARCHAR(64) NOT NULL,
+    Role NVARCHAR(20) NOT NULL,
+    Phone NVARCHAR(30) NOT NULL,
+    Address NVARCHAR(250) NULL,
+    Status NVARCHAR(20) NOT NULL CONSTRAINT DF_Users_Status DEFAULT N'Active',
+    CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_Users_CreatedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_Users PRIMARY KEY CLUSTERED (UserId),
+    CONSTRAINT UQ_Users_Email UNIQUE (Email),
+    CONSTRAINT UQ_Users_Username UNIQUE (Username),
+    CONSTRAINT CK_Users_Role CHECK (Role IN (N'Customer', N'Owner', N'Admin', N'SuperAdmin')),
+    CONSTRAINT CK_Users_Status CHECK (Status IN (N'Active', N'Suspended'))
+);
+
+Cars Table
+
+CREATE TABLE dbo.Cars
+(
+    CarId INT IDENTITY(1,1) NOT NULL,
+    OwnerId INT NOT NULL,
+    CarName NVARCHAR(100) NOT NULL,
+    Brand NVARCHAR(60) NOT NULL,
+    Model NVARCHAR(60) NOT NULL,
+    CarNumber NVARCHAR(50) NOT NULL,
+    Seats INT NOT NULL,
+    PricePerDay DECIMAL(12,2) NOT NULL,
+    Location NVARCHAR(100) NOT NULL,
+    Status NVARCHAR(20) NOT NULL CONSTRAINT DF_Cars_Status DEFAULT N'Available',
+    Description NVARCHAR(500) NULL,
+    CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_Cars_CreatedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_Cars PRIMARY KEY CLUSTERED (CarId),
+    CONSTRAINT UQ_Cars_CarNumber UNIQUE (CarNumber),
+    CONSTRAINT FK_Cars_Users_Owner FOREIGN KEY (OwnerId) REFERENCES dbo.Users(UserId),
+    CONSTRAINT CK_Cars_Seats CHECK (Seats > 0),
+    CONSTRAINT CK_Cars_PricePerDay CHECK (PricePerDay > 0),
+    CONSTRAINT CK_Cars_Status CHECK (Status IN (N'Available', N'Rented', N'Maintenance', N'Unavailable'))
+);
+
+Bookings Table
+
+CREATE TABLE dbo.Bookings
+(
+    BookingId INT IDENTITY(1,1) NOT NULL,
+    CustomerId INT NOT NULL,
+    CarId INT NOT NULL,
+    RentDate DATE NOT NULL,
+    ExpectedReturnDate DATE NOT NULL,
+    ActualReturnDate DATE NULL,
+    TotalAmount DECIMAL(12,2) NOT NULL,
+    DiscountAmount DECIMAL(12,2) NOT NULL CONSTRAINT DF_Bookings_DiscountAmount DEFAULT 0,
+    PayableAmount DECIMAL(12,2) NOT NULL,
+    PaymentStatus NVARCHAR(20) NOT NULL CONSTRAINT DF_Bookings_PaymentStatus DEFAULT N'Unpaid',
+    BookingStatus NVARCHAR(20) NOT NULL CONSTRAINT DF_Bookings_BookingStatus DEFAULT N'Active',
+    CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_Bookings_CreatedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_Bookings PRIMARY KEY CLUSTERED (BookingId),
+    CONSTRAINT FK_Bookings_Users_Customer FOREIGN KEY (CustomerId) REFERENCES dbo.Users(UserId),
+    CONSTRAINT FK_Bookings_Cars FOREIGN KEY (CarId) REFERENCES dbo.Cars(CarId),
+    CONSTRAINT CK_Bookings_Dates CHECK (ExpectedReturnDate > RentDate),
+    CONSTRAINT CK_Bookings_ActualReturnDate CHECK (ActualReturnDate IS NULL OR ActualReturnDate >= RentDate),
+    CONSTRAINT CK_Bookings_Amounts CHECK (TotalAmount >= 0 AND DiscountAmount >= 0 AND PayableAmount >= 0),
+    CONSTRAINT CK_Bookings_PaymentStatus CHECK (PaymentStatus IN (N'Unpaid', N'Paid')),
+    CONSTRAINT CK_Bookings_BookingStatus CHECK (BookingStatus IN (N'Active', N'Completed', N'Cancelled'))
+);
+
+Offers Table
+
+CREATE TABLE dbo.Offers
+(
+    OfferId INT IDENTITY(1,1) NOT NULL,
+    OfferTitle NVARCHAR(120) NOT NULL,
+    Description NVARCHAR(500) NULL,
+    DiscountPercent DECIMAL(5,2) NOT NULL,
+    StartDate DATE NOT NULL,
+    EndDate DATE NOT NULL,
+    OfferScope NVARCHAR(20) NOT NULL,
+    CarId INT NULL,
+    CreatedByUserId INT NOT NULL,
+    Status NVARCHAR(20) NOT NULL CONSTRAINT DF_Offers_Status DEFAULT N'Active',
+    CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_Offers_CreatedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_Offers PRIMARY KEY CLUSTERED (OfferId),
+    CONSTRAINT FK_Offers_Cars FOREIGN KEY (CarId) REFERENCES dbo.Cars(CarId),
+    CONSTRAINT FK_Offers_Users_CreatedBy FOREIGN KEY (CreatedByUserId) REFERENCES dbo.Users(UserId),
+    CONSTRAINT CK_Offers_Discount CHECK (DiscountPercent > 0 AND DiscountPercent <= 100),
+    CONSTRAINT CK_Offers_Dates CHECK (EndDate >= StartDate),
+    CONSTRAINT CK_Offers_Scope CHECK (OfferScope IN (N'Platform', N'Owner', N'Car')),
+    CONSTRAINT CK_Offers_Status CHECK (Status IN (N'Active', N'Inactive', N'Expired'))
+);
+
+Payment Table
+
+CREATE TABLE dbo.Payments
+(
+    PaymentId INT IDENTITY(1,1) NOT NULL,
+    BookingId INT NOT NULL,
+    CustomerId INT NOT NULL,
+    Amount DECIMAL(12,2) NOT NULL,
+    PaymentMethod NVARCHAR(30) NOT NULL,
+    TransactionNumber NVARCHAR(100) NOT NULL,
+    PaymentStatus NVARCHAR(20) NOT NULL CONSTRAINT DF_Payments_PaymentStatus DEFAULT N'Paid',
+    PaymentDate DATETIME2(0) NOT NULL CONSTRAINT DF_Payments_PaymentDate DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_Payments PRIMARY KEY CLUSTERED (PaymentId),
+    CONSTRAINT UQ_Payments_TransactionNumber UNIQUE (TransactionNumber),
+    CONSTRAINT FK_Payments_Bookings FOREIGN KEY (BookingId) REFERENCES dbo.Bookings(BookingId),
+    CONSTRAINT FK_Payments_Users_Customer FOREIGN KEY (CustomerId) REFERENCES dbo.Users(UserId),
+    CONSTRAINT CK_Payments_Amount CHECK (Amount > 0),
+    CONSTRAINT CK_Payments_Method CHECK (PaymentMethod IN (N'bKash', N'Nagad', N'Rocket', N'Card', N'Cash')),
+    CONSTRAINT CK_Payments_Status CHECK (PaymentStatus IN (N'Paid', N'Failed', N'Refunded'))
+);
+
+
+
+
+
+
+Fines Table
+
+CREATE TABLE dbo.Fines
+(
+    FineId INT IDENTITY(1,1) NOT NULL,
+    BookingId INT NOT NULL,
+    LateDays INT NOT NULL,
+    FineAmount DECIMAL(12,2) NOT NULL,
+    FineStatus NVARCHAR(20) NOT NULL CONSTRAINT DF_Fines_FineStatus DEFAULT N'Unpaid',
+    CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_Fines_CreatedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_Fines PRIMARY KEY CLUSTERED (FineId),
+    CONSTRAINT UQ_Fines_BookingId UNIQUE (BookingId),
+    CONSTRAINT FK_Fines_Bookings FOREIGN KEY (BookingId) REFERENCES dbo.Bookings(BookingId),
+    CONSTRAINT CK_Fines_LateDays CHECK (LateDays >= 0),
+    CONSTRAINT CK_Fines_FineAmount CHECK (FineAmount >= 0),
+    CONSTRAINT CK_Fines_Status CHECK (FineStatus IN (N'Unpaid', N'Paid'))
+);
+
+Reviews Table
+
+CREATE TABLE dbo.Reviews
+(
+    ReviewId INT IDENTITY(1,1) NOT NULL,
+    BookingId INT NOT NULL,
+    CustomerId INT NOT NULL,
+    CarId INT NOT NULL,
+    OwnerId INT NOT NULL,
+    Rating INT NOT NULL,
+    Comment NVARCHAR(1000) NOT NULL,
+    CreatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_Reviews_CreatedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_Reviews PRIMARY KEY CLUSTERED (ReviewId),
+    CONSTRAINT UQ_Reviews_BookingId UNIQUE (BookingId),
+    CONSTRAINT FK_Reviews_Bookings FOREIGN KEY (BookingId) REFERENCES dbo.Bookings(BookingId),
+    CONSTRAINT FK_Reviews_Users_Customer FOREIGN KEY (CustomerId) REFERENCES dbo.Users(UserId),
+    CONSTRAINT FK_Reviews_Cars FOREIGN KEY (CarId) REFERENCES dbo.Cars(CarId),
+    CONSTRAINT FK_Reviews_Users_Owner FOREIGN KEY (OwnerId) REFERENCES dbo.Users(UserId),
+    CONSTRAINT CK_Reviews_Rating CHECK (Rating BETWEEN 1 AND 5)
+);
+
